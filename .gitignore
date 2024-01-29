@@ -19,5 +19,4 @@ src/search.py
 *.out
 *.zip
 *.map
-*.png
 *.sh
