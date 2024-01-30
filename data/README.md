@@ -1,10 +1,10 @@
 # Dataset
 
-We use public [Amazon dataset](http://jmcauley.ucsd.edu/data/amazon/links.html) (*Grocery_and_Gourmet_Food* category, 5-core version with metadata) as our build-in dataset.  Other datasets after preprocessing can be downloaded online:
+We use public [Amazon dataset](http://jmcauley.ucsd.edu/data/amazon/links.html) (*Office_Products* category, 5-core version with metadata) as our build-in dataset.  Other datasets after preprocessing can be downloaded online:
 
 * Amazon Electronics: [Google Drive](https://drive.google.com/drive/folders/1F2DSMOwHQgQRmuKMjN24FcqyVh-RrlFe?usp=sharing)
 
-* RecSys2017: [Google Drive](https://drive.google.com/drive/folders/1rhUQwTYVai4kt54GAjdFUU4CVryNPwC9?usp=sharing)
+* MovieLens-100k: [Google Drive](https://drive.google.com/drive/folders/1rhUQwTYVai4kt54GAjdFUU4CVryNPwC9?usp=sharing)
 
 To run codes on customized datasets, we describe the format of required files below:
 
