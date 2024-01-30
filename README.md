@@ -26,4 +26,4 @@ cd src
 4. Run model on the build-in dataset
 
 ```bash
-python main.py --model_name KDAPlus --emb_size 64 --include_attr 1 --include_val 1 --freq_rand 1 --lr 1e-3 --l2 1e-6 --num_heads 4 --num_layers 5 --gamma -1 --history_max 20 --dataset Office --latent_relation_num 5 --include_lrd 1 --lamda 5 --epoch 200 --plm_name feat.GPT --plm_size 1536
+python main.py --model_name KDAPlus --emb_size 64 --include_attr 1 --include_val 1 --freq_rand 1 --lr 1e-3 --l2 1e-6 --num_heads 4 --num_layers 5 --gamma -1 --history_max 20 --dataset Office --include_lrd 1 --epoch 200 --gpu 0

@@ -29,7 +29,7 @@ class RCF(SequentialModel):
                             help='Number of attention heads.')
         parser.add_argument('--gamma', type=float, default=-1,
                             help='Coefficient of KG loss (-1 for auto-determine).')
-        parser.add_argument('--lamda', type=float, default=1.0,
+        parser.add_argument('--lamda', type=float, default=10,
                             help='Coefficient of LRD loss.')
         parser.add_argument('--alpha', type=float, default=0.1,
                             help='Coefficient of entropy.')
@@ -39,13 +39,13 @@ class RCF(SequentialModel):
                             help='Method of pooling relational history embeddings: average, max, attention')
         parser.add_argument('--include_val', type=int, default=1,
                             help='Whether include relation value in the relation representation')
-        parser.add_argument('--latent_relation_num', type=int, default=0,
+        parser.add_argument('--latent_relation_num', type=int, default=5,
                             help='the number of latent relations')
         parser.add_argument('--leave_one_latent', type=int, default=0,
                             help='whether leave one latent relation as no relation')
-        parser.add_argument('--plm_name', type=str, default="featCLS.BERT",
+        parser.add_argument('--plm_name', type=str, default="feat.GPT",
                             help='the name of plm')
-        parser.add_argument('--plm_size', type=int, default=768,
+        parser.add_argument('--plm_size', type=int, default=1536,
                             help='the dim of plm')
         parser.add_argument('--include_lrd', type=int, default=1,
                             help='Whether include latent relation discovery module')
