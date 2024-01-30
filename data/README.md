@@ -1,6 +1,6 @@
 # Dataset
 
-We use public [Amazon dataset](http://jmcauley.ucsd.edu/data/amazon/links.html) (*Office_Products* category, 5-core version with metadata) as our build-in dataset.  Other datasets after preprocessing can be downloaded online:
+We use public [Amazon dataset](http://jmcauley.ucsd.edu/data/amazon/links.html) (*Office_Products*, 5-core version with metadata) as our build-in dataset.  Other datasets after preprocessing can be downloaded online:
 
 * Amazon Electronics: [Google Drive](https://drive.google.com/drive/folders/1F2DSMOwHQgQRmuKMjN24FcqyVh-RrlFe?usp=sharing)
 
