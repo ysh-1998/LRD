@@ -10,12 +10,7 @@ model/
 src/search.py
 *.pkl
 *.txt
-*.csv
 *.gz
-*.text
-*.user2index
-*.item2index
-*feat*
 *.out
 *.zip
 *.map
