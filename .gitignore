@@ -9,7 +9,6 @@ doc/
 model/
 src/search.py
 *.pkl
-*.txt
 *.gz
 *.out
 *.zip

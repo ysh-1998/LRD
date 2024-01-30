@@ -2,9 +2,9 @@
 
 We use public [Amazon dataset](http://jmcauley.ucsd.edu/data/amazon/links.html) (*Office_Products*, 5-core version with metadata) as our build-in dataset.  Other datasets after preprocessing can be downloaded online:
 
-* Amazon Electronics: [Google Drive](https://drive.google.com/drive/folders/1F2DSMOwHQgQRmuKMjN24FcqyVh-RrlFe?usp=sharing)
+* Amazon Electronics: [Google Drive](https://drive.google.com/drive/folders/1qGz2AmdS_85c8MWgVEVv35NXGkaYdPEA?usp=sharing)
 
-* MovieLens-100k: [Google Drive](https://drive.google.com/drive/folders/1rhUQwTYVai4kt54GAjdFUU4CVryNPwC9?usp=sharing)
+* MovieLens-100k: [Google Drive](https://drive.google.com/drive/folders/1365_Z6KRHaSCNdBbEUEXruCsd8x3ZL9d?usp=sharing)
 
 To run codes on customized datasets, we describe the format of required files below:
 
