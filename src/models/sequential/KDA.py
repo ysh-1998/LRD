@@ -10,7 +10,7 @@ from models.BaseModel import SequentialModel
 from helpers.DFTReader import DFTReader
 
 
-class KDAOri(SequentialModel):
+class KDA(SequentialModel):
     reader = 'DFTReader'
     extra_log_args = ['num_layers', 'num_heads', 'gamma', 'freq_rand', 'include_val']
 

@@ -14,4 +14,4 @@ src/search.py
 *.zip
 *.map
 *.sh
-*.log
+*.txt

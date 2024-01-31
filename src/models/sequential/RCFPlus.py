@@ -12,7 +12,7 @@ from helpers.DFTReader import DFTReader
 from helpers.KGReader import KGReader
 
 
-class RCF(SequentialModel):
+class RCFPlus(SequentialModel):
     reader = 'KGReader'
     # extra_log_args = ['num_layers', 'num_heads', 'gamma', 'alpha', 'freq_rand', 'include_val', 'latent_relation_num', 'include_lrd', "message"]
     extra_log_args = ['num_layers', 'num_heads', 'alpha', 'lamda', 'latent_relation_num', 'leave_one_latent', 'include_lrd', "message"]
@@ -39,7 +39,7 @@ class RCF(SequentialModel):
                             help='Method of pooling relational history embeddings: average, max, attention')
         parser.add_argument('--include_val', type=int, default=1,
                             help='Whether include relation value in the relation representation')
-        parser.add_argument('--latent_relation_num', type=int, default=0,
+        parser.add_argument('--latent_relation_num', type=int, default=5,
                             help='the number of latent relations')
         parser.add_argument('--leave_one_latent', type=int, default=0,
                             help='whether leave one latent relation as no relation')
@@ -47,7 +47,7 @@ class RCF(SequentialModel):
                             help='the name of plm')
         parser.add_argument('--plm_size', type=int, default=1536,
                             help='the dim of plm')
-        parser.add_argument('--include_lrd', type=int, default=0,
+        parser.add_argument('--include_lrd', type=int, default=1,
                             help='Whether include latent relation discovery module')
         parser.add_argument('--include_kge', type=int, default=1,
                             help='Whether include Knowledge Graph Embedding module')
