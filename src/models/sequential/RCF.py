@@ -14,8 +14,7 @@ from helpers.KGReader import KGReader
 
 class RCF(SequentialModel):
     reader = 'KGReader'
-    # extra_log_args = ['num_layers', 'num_heads', 'gamma', 'alpha', 'freq_rand', 'include_val', 'latent_relation_num', 'include_lrd', "message"]
-    extra_log_args = ['num_layers', 'num_heads', 'alpha', 'lamda', 'latent_relation_num', 'leave_one_latent', 'include_lrd', "message"]
+    extra_log_args = ['num_layers', 'num_heads']
 
     @staticmethod
     def parse_model_args(parser):
@@ -29,26 +28,12 @@ class RCF(SequentialModel):
                             help='Number of attention heads.')
         parser.add_argument('--gamma', type=float, default=-1,
                             help='Coefficient of KG loss (-1 for auto-determine).')
-        parser.add_argument('--lamda', type=float, default=10,
-                            help='Coefficient of LRD loss.')
-        parser.add_argument('--alpha', type=float, default=0.1,
-                            help='Coefficient of entropy.')
         parser.add_argument('--attention_size', type=int, default=10,
                             help='Size of attention hidden space.')
         parser.add_argument('--pooling', type=str, default='average',
                             help='Method of pooling relational history embeddings: average, max, attention')
         parser.add_argument('--include_val', type=int, default=1,
                             help='Whether include relation value in the relation representation')
-        parser.add_argument('--latent_relation_num', type=int, default=0,
-                            help='the number of latent relations')
-        parser.add_argument('--leave_one_latent', type=int, default=0,
-                            help='whether leave one latent relation as no relation')
-        parser.add_argument('--plm_name', type=str, default="feat.GPT",
-                            help='the name of plm')
-        parser.add_argument('--plm_size', type=int, default=1536,
-                            help='the dim of plm')
-        parser.add_argument('--include_lrd', type=int, default=0,
-                            help='Whether include latent relation discovery module')
         parser.add_argument('--include_kge', type=int, default=1,
                             help='Whether include Knowledge Graph Embedding module')
         parser.add_argument('--message', type=str, default="",
@@ -58,9 +43,6 @@ class RCF(SequentialModel):
     def __init__(self, args, corpus):
         self.relation_num = corpus.n_relations
         self.entity_num = corpus.n_entities
-        # self.freq_x = corpus.freq_x
-        # self.freq_dim = args.n_dft // 2 + 1
-        # self.freq_rand = args.freq_rand
         self.emb_size = args.emb_size
         self.neg_head_p = args.neg_head_p
         self.layer_num = args.num_layers
@@ -76,7 +58,6 @@ class RCF(SequentialModel):
         self.plm_name = args.plm_name
         self.plm_size = args.plm_size
         self.plm_embedding_path = f"../data/{args.dataset}/{args.dataset}.{self.plm_name}"
-        self.include_lrd = args.include_lrd
         self.include_kge = args.include_kge
         self.only_predict = args.only_predict
         if self.gamma < 0:
@@ -85,21 +66,11 @@ class RCF(SequentialModel):
 
     def _define_params(self):
         self.user_embeddings = nn.Embedding(self.user_num, self.emb_size)
-        if self.include_lrd:
-            self.item_embeddings = nn.Embedding(self.item_num, self.plm_size, padding_idx=0)
-            self.project_layer_1 = nn.Linear(self.plm_size, self.emb_size)
-            # self.project_layer_2 = nn.Linear(self.emb_size*2, self.emb_size)
-            self.project_layer_2 = nn.Linear(self.emb_size*2, self.relation_num)
         self.entity_embeddings = nn.Embedding(self.entity_num, self.emb_size)
         self.relation_embeddings = nn.Embedding(self.relation_num, self.emb_size)
-        # First-level aggregation
-        # self.relational_dynamic_aggregation = RelationalDynamicAggregation(
-        #     self.relation_num, self.freq_dim, self.relation_embeddings, self.include_val, self.device
-        # )
         self.relational_dynamic_aggregation = RelationalDynamicAggregation(
             self.relation_num, self.relation_embeddings, self.include_val, self.device
         )
-        # Second-level aggregation
         self.attn_head = layers.MultiHeadAttention(self.emb_size, self.head_num, bias=False)
         self.W1 = nn.Linear(self.emb_size, self.emb_size)
         self.W2 = nn.Linear(self.emb_size, self.emb_size)
@@ -112,33 +83,9 @@ class RCF(SequentialModel):
         # Prediction
         self.item_bias = nn.Embedding(self.item_num + 1, 1)
 
-    def load_plm_embedding(self):
-        feat_path = self.plm_embedding_path
-        if "GPT" in self.plm_name:
-            loaded_feat = np.fromfile(feat_path, dtype=np.float64).reshape(self.item_num-1, -1)
-        elif "E5" in self.plm_name:
-            loaded_feat = np.fromfile(feat_path, dtype=np.float16).reshape(self.item_num-1, -1)
-        else:
-            loaded_feat = np.fromfile(feat_path, dtype=np.float32).reshape(self.item_num-1, -1)
-        # self.plm_size = loaded_feat.shape[1]
-        mapped_feat = np.zeros((self.item_num, self.plm_size))
-        mapped_feat[1:] = loaded_feat
-        return mapped_feat
-
-    def weight2emb(self, weight):
-        # self.item_embeddings = nn.Embedding(self.item_num, self.plm_size, padding_idx=0)
-        self.item_embeddings.weight.requires_grad = False
-        self.item_embeddings.weight.data.copy_(torch.from_numpy(weight))
 
     def actions_before_train(self):
-        if self.include_lrd:
-            item_plm_embedding_weight = self.load_plm_embedding()
-            self.weight2emb(item_plm_embedding_weight)
-        # if not self.freq_rand:
-        #     dft_freq_real = torch.tensor(np.real(self.freq_x))  # R * n_freq
-        #     dft_freq_imag = torch.tensor(np.imag(self.freq_x))
-        #     self.relational_dynamic_aggregation.freq_real.weight.data.copy_(dft_freq_real)
-        #     self.relational_dynamic_aggregation.freq_imag.weight.data.copy_(dft_freq_imag)
+        pass
 
     def forward(self, feed_dict):
         self.check_list = []
@@ -152,84 +99,7 @@ class RCF(SequentialModel):
             if self.include_kge:
                 kg_prediction = self.kg_forward(feed_dict)
                 out_dict['kg_prediction'] = kg_prediction
-            if self.include_lrd:
-                lrd_loss = self.lrd_forward(feed_dict)
-                out_dict['lrd_loss'] = lrd_loss
         return out_dict
-
-    def get_triple_score(self, his_vectors,w_r_vectors, i_vectors):
-        triple_score_1 = (his_vectors[:, :, None, :] * w_r_vectors)  # B * H * R * V
-        triple_score_1 = (triple_score_1 * i_vectors[:, None, None, :]).sum(-1)  # B * H * R
-        triple_score_2 = (his_vectors[:, :, None, :] * w_r_vectors).sum(-1)  # B * H * R
-        triple_score_3 = (i_vectors[:, None, None, :] * w_r_vectors).sum(-1)  # B * H * R
-        triple_score = triple_score_1 + triple_score_2 + triple_score_3  # B * H * R
-
-        return triple_score
-
-    def lrd_predict(self, feed_dict):
-        i_ids = feed_dict['item_id'][:,0]  # B
-        history = feed_dict['history_items']  # B * H
-        batch_size, seq_len = history.shape
-        valid_mask = (history > 0).view(batch_size, seq_len, 1)
-
-        # item embedding
-        i_t_vectors = self.item_embeddings(i_ids)  # B * V
-        i_t_vectors = self.project_layer_1(i_t_vectors)  # B * V
-        his_t_vectors = self.item_embeddings(history)  # B * H * V
-        his_t_vectors = self.project_layer_1(his_t_vectors)  # B * H * V
-        
-        # relation extraction
-        his_i_t_vectors = torch.cat((his_t_vectors, i_t_vectors.unsqueeze(1).repeat(1, his_t_vectors.shape[1], 1)), dim=-1) # B * H * 2V
-        ri_vectors = self.project_layer_2(his_i_t_vectors) # B * H * R
-        ri_vectors = ri_vectors - ri_vectors.max()  # B * H * R
-        ri_vectors = ri_vectors.softmax(dim=-1)  # B * H * R
-        ri_vectors = torch.where(valid_mask.repeat(1,1,self.relation_num), ri_vectors, 0.)
-        i_ids = i_ids.unsqueeze(1).repeat(1,seq_len).view(-1,1)
-        his_i_ids = torch.cat((history.view(-1,1),i_ids),dim=-1)
-        ri_vectors = ri_vectors.view(-1,self.relation_num)
-        return his_i_ids, ri_vectors
-
-    def lrd_forward(self, feed_dict):
-        i_ids = feed_dict['item_id'][:,0]  # B
-        history = feed_dict['history_items']  # B * H
-        # neg_history = torch.flip(history, [0])
-        neg_history = feed_dict["neg_his_items"]
-        batch_size, seq_len = history.shape
-        # entity embedding
-        i_vectors = self.entity_embeddings(i_ids) # B * V
-        his_vectors = self.entity_embeddings(history)  # B * H * V
-        neg_his_vectors = self.entity_embeddings(neg_history)  # B * H * V
-        # item embedding
-        i_t_vectors = self.item_embeddings(i_ids)  # B * V
-        i_t_vectors = self.project_layer_1(i_t_vectors)  # B * V
-        his_t_vectors = self.item_embeddings(history)  # B * H * V
-        his_t_vectors = self.project_layer_1(his_t_vectors)  # B * H * V
-        
-        # relation extraction
-        his_i_t_vectors = torch.cat((his_t_vectors, i_t_vectors.unsqueeze(1).repeat(1, his_t_vectors.shape[1], 1)), dim=-1) # B * H * 2V
-        ri_vectors = self.project_layer_2(his_i_t_vectors) # B * H * R
-        relation_range = torch.from_numpy(np.arange(self.relation_num)).to(self.device)
-        r_vectors = self.relation_embeddings(relation_range) # R * V
-        # ri_vectors = (r_vectors[None, None,:, :] * his_t_vectors[:, :, None, :]).sum(-1)  # B * H * R
-        ri_vectors = ri_vectors - ri_vectors.max()  # B * H * R
-        ri_vectors = ri_vectors.softmax(dim=-1)  # B * H * R
-        # print(ri_vectors[0,0])
-        w_r_vectors = (ri_vectors[:, :, :, None] * r_vectors[None, None, :, :])  # B * H * R * V
-        # remove last relation
-        if self.leave_one_latent:
-            w_r_vectors = w_r_vectors[:, :, 1:, :]  # B * H * R-1 * V
-
-        # item reconstruction
-        triple_score_pos = self.get_triple_score(his_vectors, w_r_vectors, i_vectors) # B * H * R
-        triple_score_neg = self.get_triple_score(neg_his_vectors, w_r_vectors, i_vectors) # B * H * R
-        valid_mask = (history > 0).view(batch_size, seq_len, 1).type(torch.float32)  # B * H * 1
-        valid_len = valid_mask.sum(dim=1)  # B * 1
-        # lrd_loss_1 = -(((triple_score_pos - triple_score_neg).sigmoid() * valid_mask).sum(dim=-2) / valid_len).log().mean()
-        # lrd_loss_2 = -(self.alpha * -(ri_vectors * ri_vectors.log()).mean())
-        # lrd_loss =  lrd_loss_1 + lrd_loss_2
-        lrd_loss = -(((triple_score_pos - triple_score_neg).sigmoid() * valid_mask).sum(dim=-2) / valid_len).log().mean() + self.alpha * (-ri_vectors * ri_vectors.log()).mean()
-        # lrd_loss = -(((triple_score_pos.sigmoid().log() + (-triple_score_neg).sigmoid().log()) * valid_mask).sum(-2) / valid_len).mean() + self.alpha * (-ri_vectors * ri_vectors.log()).mean()
-        return lrd_loss
 
     def rec_forward(self, feed_dict):
         u_ids = feed_dict['user_id']  # B
@@ -237,7 +107,6 @@ class RCF(SequentialModel):
         target_i_ids = i_ids[:,0]  # B
         v_ids = feed_dict['item_val']  # B * -1 * R
         history = feed_dict['history_items']  # B * H
-        # delta_t_n = feed_dict['history_delta_t'].float()  # B * H
         batch_size, seq_len = history.shape
 
         u_vectors = self.user_embeddings(u_ids)
@@ -249,8 +118,6 @@ class RCF(SequentialModel):
         Relational Dynamic History Aggregation
         """
         valid_mask = (history > 0).view(batch_size, 1, seq_len, 1)
-        # context = self.relational_dynamic_aggregation(
-        #     his_vectors, delta_t_n, i_vectors, v_vectors, valid_mask)  # B * -1 * R * V
         context, target_attention = self.relational_dynamic_aggregation(
             his_vectors, i_vectors, v_vectors, valid_mask)  # B * -1 * R * V
         if self.only_predict:
@@ -316,7 +183,7 @@ class RCF(SequentialModel):
         return prediction
 
     def loss(self, out_dict):
-        rec_loss, lrd_loss, kg_loss = 0,0,0
+        rec_loss, kg_loss = 0,0
         predictions = out_dict['prediction']
         pos_pred, neg_pred = predictions[:, 0], predictions[:, 1:]
         neg_softmax = (neg_pred - neg_pred.max()).softmax(dim=1)
@@ -328,11 +195,8 @@ class RCF(SequentialModel):
             neg_softmax = (neg_pred - neg_pred.max()).softmax(dim=1)
             kg_loss = -((pos_pred[:, None] - neg_pred).sigmoid() * neg_softmax).sum(dim=1).log().mean()
             loss += self.gamma * kg_loss
-        if self.include_lrd:
-            lrd_loss = out_dict['lrd_loss']
-            loss += self.lamda * lrd_loss
         
-        return loss, [rec_loss,lrd_loss,kg_loss]
+        return loss, [rec_loss,kg_loss]
 
     class Dataset(SequentialModel.Dataset):
         def __init__(self, model, corpus, phase):
@@ -359,8 +223,6 @@ class RCF(SequentialModel):
             feed_dict = super()._get_feed_dict(index)
             feed_dict['user_id'] = self.data['user_id'][index]
             feed_dict['item_val'] = [self.item_val_dict[item] for item in feed_dict['item_id']]
-            # delta_t = self.data['time'][index] - self.data['time_his'][index]
-            # feed_dict['history_delta_t'] = DFTReader.norm_time(delta_t, self.corpus.t_scalar)
             if self.phase == 'train':
                 feed_dict['head_id'] = np.concatenate([[self.kg_data['head'][index]], self.neg_heads[index]])
                 feed_dict['tail_id'] = np.concatenate([[self.kg_data['tail'][index]], self.neg_tails[index]])
@@ -422,30 +284,13 @@ class RCF(SequentialModel):
 
 
 class RelationalDynamicAggregation(nn.Module):
-    # def __init__(self, n_relation, n_freq, relation_embeddings, include_val, device):
     def __init__(self, n_relation, relation_embeddings, include_val, device):
         super().__init__()
         self.relation_embeddings = relation_embeddings
         self.include_val = include_val
         self.n_relation = n_relation
-        # self.freq_real = nn.Embedding(n_relation, n_freq)
-        # self.freq_imag = nn.Embedding(n_relation, n_freq)
-        # freq = np.linspace(0, 1, n_freq) / 2.
-        # self.freqs = torch.from_numpy(np.concatenate((freq, -freq))).to(device).float()
         self.relation_range = torch.from_numpy(np.arange(n_relation)).to(device)
 
-    # def idft_decay(self, delta_t):
-    #     real, imag = self.freq_real(self.relation_range), self.freq_imag(self.relation_range)
-    #     # create conjugate symmetric to ensure real number output
-    #     x_real = torch.cat([real, real], dim=-1)
-    #     x_imag = torch.cat([imag, -imag], dim=-1)
-    #     w = 2. * np.pi * self.freqs * delta_t.unsqueeze(-1)  # B * H * n_freq
-    #     real_part = w.cos()[:, :, None, :] * x_real[None, None, :, :]  # B * H * R * n_freq
-    #     imag_part = w.sin()[:, :, None, :] * x_imag[None, None, :, :]
-    #     decay = (real_part - imag_part).mean(dim=-1) / 2.  # B * H * R
-    #     return decay.float()
-
-    # def forward(self, seq, delta_t_n, target, target_value, valid_mask):
     def forward(self, seq, target, target_value, valid_mask):
         '''
             seq: user history item embeddings, B * H * V
@@ -470,9 +315,7 @@ class RelationalDynamicAggregation(nn.Module):
         # shift masked softmax
         attention = attention - attention.max()
         attention = attention.masked_fill(valid_mask == 0, -np.inf).softmax(dim=-2)
-        # temporal evolution
-        # decay = self.idft_decay(delta_t_n).clamp(0, 1).unsqueeze(1).masked_fill(valid_mask==0, 0.)  # B * 1 * H * R
-        # attention = attention * decay
+
         # attentional aggregation of history items
         context = (seq[:, None, :, None, :] * attention[:, :, :, :, None]).sum(-3)  # B * -1 * R * V
         return context, target_attention
