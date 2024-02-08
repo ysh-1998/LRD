@@ -50,14 +50,7 @@ class RCF(SequentialModel):
         self.attention_size = args.attention_size
         self.pooling = args.pooling.lower()
         self.include_val = args.include_val
-        self.latent_relation_num = args.latent_relation_num
-        self.leave_one_latent = args.leave_one_latent
         self.gamma = args.gamma
-        self.alpha = args.alpha
-        self.lamda = args.lamda
-        self.plm_name = args.plm_name
-        self.plm_size = args.plm_size
-        self.plm_embedding_path = f"../data/{args.dataset}/{args.dataset}.{self.plm_name}"
         self.include_kge = args.include_kge
         self.only_predict = args.only_predict
         if self.gamma < 0:
@@ -208,12 +201,10 @@ class RCF(SequentialModel):
             # Prepare item-to-value dict
             item_val = self.corpus.item_meta_df.copy()
             item_val[self.corpus.item_relations] = 0  # set the value of natural item relations to None
-            latent_relations = list(range(self.model.latent_relation_num))
-            item_val[latent_relations] = 0 # set the value of latent relations to None
             for idx, r in enumerate(self.corpus.attr_relations):
                 base = self.corpus.n_items + np.sum(self.corpus.attr_max[:idx])
                 item_val[r] = item_val[r].apply(lambda x: x + base).astype(int)
-            item_vals = item_val[self.corpus.relations+latent_relations].values  # this ensures the order is consistent to relations
+            item_vals = item_val[self.corpus.relations].values  # this ensures the order is consistent to relations
             self.item_val_dict = dict()
             for item, vals in zip(item_val['item_id'].values, item_vals.tolist()):
                 self.item_val_dict[item] = [0] + vals  # the first dimension None for the virtual relation
