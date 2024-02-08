@@ -27,9 +27,9 @@ cd src
 
 ```bash
 # RCF
-python main.py --model_name RCF --emb_size 64 --include_attr 1 --include_val 1 --freq_rand 1 --lr 1e-4 --l2 1e-6 --num_heads 4 --num_layers 5 --gamma -1 --history_max 20 --dataset Office --epoch 200 --gpu 0
+python main.py --model_name RCF --emb_size 64 --include_attr 1 --include_val 1 --lr 1e-4 --l2 1e-6 --num_heads 4 --num_layers 5 --gamma -1 --history_max 20 --dataset Office --epoch 200 --gpu 0
 # RCF_LRD
-python main.py --model_name RCFPlus --emb_size 64 --include_attr 1 --include_val 1 --freq_rand 1 --lr 1e-4 --l2 1e-6 --num_heads 4 --num_layers 5 --gamma -1 --history_max 20 --dataset Office --include_lrd 1 --epoch 200 --gpu 0
+python main.py --model_name RCFPlus --emb_size 64 --include_attr 1 --include_val 1 --lr 1e-4 --l2 1e-6 --num_heads 4 --num_layers 5 --gamma -1 --history_max 20 --dataset Office --include_lrd 1 --epoch 200 --gpu 0
 # KDA
 python main.py --model_name KDA --emb_size 64 --include_attr 1 --include_val 1 --freq_rand 1 --lr 1e-3 --l2 1e-6 --num_heads 4 --num_layers 5 --gamma -1 --history_max 20 --dataset Office --epoch 200 --gpu 0
 # KDA_LRD
