@@ -14,7 +14,6 @@ from helpers.KGReader import KGReader
 
 class RCFPlus(SequentialModel):
     reader = 'KGReader'
-    # extra_log_args = ['num_layers', 'num_heads', 'gamma', 'alpha', 'freq_rand', 'include_val', 'latent_relation_num', 'include_lrd', "message"]
     extra_log_args = ['num_layers', 'num_heads', 'alpha', 'lamda', 'latent_relation_num', 'leave_one_latent', 'include_lrd', "message"]
 
     @staticmethod
@@ -58,9 +57,6 @@ class RCFPlus(SequentialModel):
     def __init__(self, args, corpus):
         self.relation_num = corpus.n_relations
         self.entity_num = corpus.n_entities
-        # self.freq_x = corpus.freq_x
-        # self.freq_dim = args.n_dft // 2 + 1
-        # self.freq_rand = args.freq_rand
         self.emb_size = args.emb_size
         self.neg_head_p = args.neg_head_p
         self.layer_num = args.num_layers
