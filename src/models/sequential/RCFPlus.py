@@ -92,14 +92,9 @@ class RCFPlus(SequentialModel):
             self.project_layer_2 = nn.Linear(self.emb_size*2, self.relation_num)
         self.entity_embeddings = nn.Embedding(self.entity_num, self.emb_size)
         self.relation_embeddings = nn.Embedding(self.relation_num, self.emb_size)
-        # First-level aggregation
-        # self.relational_dynamic_aggregation = RelationalDynamicAggregation(
-        #     self.relation_num, self.freq_dim, self.relation_embeddings, self.include_val, self.device
-        # )
         self.relational_dynamic_aggregation = RelationalDynamicAggregation(
             self.relation_num, self.relation_embeddings, self.include_val, self.device
         )
-        # Second-level aggregation
         self.attn_head = layers.MultiHeadAttention(self.emb_size, self.head_num, bias=False)
         self.W1 = nn.Linear(self.emb_size, self.emb_size)
         self.W2 = nn.Linear(self.emb_size, self.emb_size)
@@ -116,8 +111,6 @@ class RCFPlus(SequentialModel):
         feat_path = self.plm_embedding_path
         if "GPT" in self.plm_name:
             loaded_feat = np.fromfile(feat_path, dtype=np.float64).reshape(self.item_num-1, -1)
-        elif "E5" in self.plm_name:
-            loaded_feat = np.fromfile(feat_path, dtype=np.float16).reshape(self.item_num-1, -1)
         else:
             loaded_feat = np.fromfile(feat_path, dtype=np.float32).reshape(self.item_num-1, -1)
         # self.plm_size = loaded_feat.shape[1]
@@ -134,11 +127,6 @@ class RCFPlus(SequentialModel):
         if self.include_lrd:
             item_plm_embedding_weight = self.load_plm_embedding()
             self.weight2emb(item_plm_embedding_weight)
-        # if not self.freq_rand:
-        #     dft_freq_real = torch.tensor(np.real(self.freq_x))  # R * n_freq
-        #     dft_freq_imag = torch.tensor(np.imag(self.freq_x))
-        #     self.relational_dynamic_aggregation.freq_real.weight.data.copy_(dft_freq_real)
-        #     self.relational_dynamic_aggregation.freq_imag.weight.data.copy_(dft_freq_imag)
 
     def forward(self, feed_dict):
         self.check_list = []
@@ -224,9 +212,6 @@ class RCFPlus(SequentialModel):
         triple_score_neg = self.get_triple_score(neg_his_vectors, w_r_vectors, i_vectors) # B * H * R
         valid_mask = (history > 0).view(batch_size, seq_len, 1).type(torch.float32)  # B * H * 1
         valid_len = valid_mask.sum(dim=1)  # B * 1
-        # lrd_loss_1 = -(((triple_score_pos - triple_score_neg).sigmoid() * valid_mask).sum(dim=-2) / valid_len).log().mean()
-        # lrd_loss_2 = -(self.alpha * -(ri_vectors * ri_vectors.log()).mean())
-        # lrd_loss =  lrd_loss_1 + lrd_loss_2
         lrd_loss = -(((triple_score_pos - triple_score_neg).sigmoid() * valid_mask).sum(dim=-2) / valid_len).log().mean() + self.alpha * (-ri_vectors * ri_vectors.log()).mean()
         # lrd_loss = -(((triple_score_pos.sigmoid().log() + (-triple_score_neg).sigmoid().log()) * valid_mask).sum(-2) / valid_len).mean() + self.alpha * (-ri_vectors * ri_vectors.log()).mean()
         return lrd_loss
@@ -237,7 +222,6 @@ class RCFPlus(SequentialModel):
         target_i_ids = i_ids[:,0]  # B
         v_ids = feed_dict['item_val']  # B * -1 * R
         history = feed_dict['history_items']  # B * H
-        # delta_t_n = feed_dict['history_delta_t'].float()  # B * H
         batch_size, seq_len = history.shape
 
         u_vectors = self.user_embeddings(u_ids)
@@ -245,19 +229,11 @@ class RCFPlus(SequentialModel):
         v_vectors = self.entity_embeddings(v_ids)  # B * -1 * R * V
         his_vectors = self.entity_embeddings(history)  # B * H * V
 
-        """
-        Relational Dynamic History Aggregation
-        """
         valid_mask = (history > 0).view(batch_size, 1, seq_len, 1)
-        # context = self.relational_dynamic_aggregation(
-        #     his_vectors, delta_t_n, i_vectors, v_vectors, valid_mask)  # B * -1 * R * V
         context, target_attention = self.relational_dynamic_aggregation(
             his_vectors, i_vectors, v_vectors, valid_mask)  # B * -1 * R * V
         if self.only_predict:
             print(target_attention[0,0])
-        """
-        Multi-layer Self-attention
-        """
         for i in range(self.layer_num):
             residual = context
             # self-attention
@@ -422,30 +398,13 @@ class RCFPlus(SequentialModel):
 
 
 class RelationalDynamicAggregation(nn.Module):
-    # def __init__(self, n_relation, n_freq, relation_embeddings, include_val, device):
     def __init__(self, n_relation, relation_embeddings, include_val, device):
         super().__init__()
         self.relation_embeddings = relation_embeddings
         self.include_val = include_val
         self.n_relation = n_relation
-        # self.freq_real = nn.Embedding(n_relation, n_freq)
-        # self.freq_imag = nn.Embedding(n_relation, n_freq)
-        # freq = np.linspace(0, 1, n_freq) / 2.
-        # self.freqs = torch.from_numpy(np.concatenate((freq, -freq))).to(device).float()
         self.relation_range = torch.from_numpy(np.arange(n_relation)).to(device)
 
-    # def idft_decay(self, delta_t):
-    #     real, imag = self.freq_real(self.relation_range), self.freq_imag(self.relation_range)
-    #     # create conjugate symmetric to ensure real number output
-    #     x_real = torch.cat([real, real], dim=-1)
-    #     x_imag = torch.cat([imag, -imag], dim=-1)
-    #     w = 2. * np.pi * self.freqs * delta_t.unsqueeze(-1)  # B * H * n_freq
-    #     real_part = w.cos()[:, :, None, :] * x_real[None, None, :, :]  # B * H * R * n_freq
-    #     imag_part = w.sin()[:, :, None, :] * x_imag[None, None, :, :]
-    #     decay = (real_part - imag_part).mean(dim=-1) / 2.  # B * H * R
-    #     return decay.float()
-
-    # def forward(self, seq, delta_t_n, target, target_value, valid_mask):
     def forward(self, seq, target, target_value, valid_mask):
         '''
             seq: user history item embeddings, B * H * V
@@ -470,9 +429,6 @@ class RelationalDynamicAggregation(nn.Module):
         # shift masked softmax
         attention = attention - attention.max()
         attention = attention.masked_fill(valid_mask == 0, -np.inf).softmax(dim=-2)
-        # temporal evolution
-        # decay = self.idft_decay(delta_t_n).clamp(0, 1).unsqueeze(1).masked_fill(valid_mask==0, 0.)  # B * 1 * H * R
-        # attention = attention * decay
         # attentional aggregation of history items
         context = (seq[:, None, :, None, :] * attention[:, :, :, :, None]).sum(-3)  # B * -1 * R * V
         return context, target_attention

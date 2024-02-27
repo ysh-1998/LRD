@@ -115,8 +115,6 @@ class KDAPlus(SequentialModel):
         feat_path = self.plm_embedding_path
         if "GPT" in self.plm_name:
             loaded_feat = np.fromfile(feat_path, dtype=np.float64).reshape(self.item_num-1, -1)
-        elif "E5" in self.plm_name:
-            loaded_feat = np.fromfile(feat_path, dtype=np.float16).reshape(self.item_num-1, -1)
         else:
             loaded_feat = np.fromfile(feat_path, dtype=np.float32).reshape(self.item_num-1, -1)
         # self.plm_size = loaded_feat.shape[1]
@@ -424,7 +422,6 @@ class KDAPlus(SequentialModel):
 
 
 class RelationalDynamicAggregation(nn.Module):
-    # def __init__(self, n_relation, n_freq, relation_embeddings, include_val, device):
     def __init__(self, n_relation, n_freq, relation_embeddings, include_val, device):
         super().__init__()
         self.relation_embeddings = relation_embeddings
@@ -448,7 +445,6 @@ class RelationalDynamicAggregation(nn.Module):
         return decay.float()
 
     def forward(self, seq, delta_t_n, target, target_value, valid_mask):
-    # def forward(self, seq, target, target_value, valid_mask):
         '''
             seq: user history item embeddings, B * H * V
             delta_t_n: time interval between current item and history items, B * H

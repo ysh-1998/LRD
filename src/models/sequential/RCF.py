@@ -8,8 +8,6 @@ import copy
 import os
 from utils import layers
 from models.BaseModel import SequentialModel
-from helpers.DFTReader import DFTReader
-from helpers.KGReader import KGReader
 
 
 class RCF(SequentialModel):
@@ -52,7 +50,6 @@ class RCF(SequentialModel):
         self.include_val = args.include_val
         self.gamma = args.gamma
         self.include_kge = args.include_kge
-        self.only_predict = args.only_predict
         if self.gamma < 0:
             self.gamma = len(corpus.relation_df) / len(corpus.all_df)
         super().__init__(args, corpus)
@@ -82,12 +79,8 @@ class RCF(SequentialModel):
 
     def forward(self, feed_dict):
         self.check_list = []
-        if self.only_predict:
-            prediction, his_i_ids, target_attention = self.rec_forward(feed_dict)
-            out_dict = {'prediction': prediction, "his_i_ids": his_i_ids, "target_attention": target_attention}
-        else:
-            prediction = self.rec_forward(feed_dict)
-            out_dict = {'prediction': prediction}
+        prediction = self.rec_forward(feed_dict)
+        out_dict = {'prediction': prediction}
         if feed_dict['phase'] == 'train':
             if self.include_kge:
                 kg_prediction = self.kg_forward(feed_dict)
@@ -107,17 +100,9 @@ class RCF(SequentialModel):
         v_vectors = self.entity_embeddings(v_ids)  # B * -1 * R * V
         his_vectors = self.entity_embeddings(history)  # B * H * V
 
-        """
-        Relational Dynamic History Aggregation
-        """
         valid_mask = (history > 0).view(batch_size, 1, seq_len, 1)
         context, target_attention = self.relational_dynamic_aggregation(
             his_vectors, i_vectors, v_vectors, valid_mask)  # B * -1 * R * V
-        if self.only_predict:
-            print(target_attention[0,0])
-        """
-        Multi-layer Self-attention
-        """
         for i in range(self.layer_num):
             residual = context
             # self-attention
@@ -149,13 +134,8 @@ class RCF(SequentialModel):
         prediction = ((u_vectors[:, None, :] + his_vector) * i_vectors).sum(dim=-1)
         prediction = prediction + i_bias
 
-        if self.only_predict:
-            target_i_ids = target_i_ids.unsqueeze(1).repeat(1,seq_len).view(-1,1)
-            his_i_ids = torch.cat((history.view(-1,1),target_i_ids),dim=-1)
-            target_attention = target_attention.view(-1,self.relation_num)
-            return prediction.view(feed_dict['batch_size'], -1), his_i_ids, target_attention
-        else:
-            return prediction.view(feed_dict['batch_size'], -1)
+
+        return prediction.view(feed_dict['batch_size'], -1)
 
     def kg_forward(self, feed_dict):
         head_ids = feed_dict['head_id'].long()  # B * -1
