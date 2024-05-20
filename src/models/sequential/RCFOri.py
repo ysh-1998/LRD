@@ -12,7 +12,7 @@ from helpers.DFTReader import DFTReader
 from helpers.KGReader import KGReader
 
 
-class RCF(SequentialModel):
+class RCFOri(SequentialModel):
     reader = 'KGReader'
     # extra_log_args = ['num_layers', 'num_heads', 'gamma', 'alpha', 'freq_rand', 'include_val', 'latent_relation_num', 'include_lrd', "message"]
     extra_log_args = ['num_layers', 'num_heads', 'alpha', 'lamda', 'latent_relation_num', 'leave_one_latent', 'include_lrd', "message"]
@@ -100,15 +100,18 @@ class RCF(SequentialModel):
             self.relation_num, self.relation_embeddings, self.include_val, self.device
         )
         # Second-level aggregation
-        self.attn_head = layers.MultiHeadAttention(self.emb_size, self.head_num, bias=False)
-        self.W1 = nn.Linear(self.emb_size, self.emb_size)
-        self.W2 = nn.Linear(self.emb_size, self.emb_size)
-        self.dropout_layer = nn.Dropout(self.dropout)
-        self.layer_norm = nn.LayerNorm(self.emb_size)
+        # self.attn_head = layers.MultiHeadAttention(self.emb_size, self.head_num, bias=False)
+        # self.W1 = nn.Linear(self.emb_size, self.emb_size)
+        # self.W2 = nn.Linear(self.emb_size, self.emb_size)
+        # self.dropout_layer = nn.Dropout(self.dropout)
+        # self.layer_norm = nn.LayerNorm(self.emb_size)
         # Pooling
-        if self.pooling == 'attention':
-            self.A = nn.Linear(self.emb_size, self.attention_size)
-            self.A_out = nn.Linear(self.attention_size, 1, bias=False)
+        # if self.pooling == 'attention':
+        self.A1 = nn.Linear(self.emb_size, self.attention_size)
+        self.A1_out = nn.Linear(self.attention_size, 1, bias=False)
+        self.A2 = torch.nn.Linear(self.emb_size, self.attention_size * (self.relation_num + 1))
+        self.A2_val = torch.nn.Linear(self.emb_size, self.attention_size)
+        self.A2_out = torch.nn.Linear(self.attention_size * 2, self.relation_num + 1, bias=False)
         # Prediction
         self.item_bias = nn.Embedding(self.item_num + 1, 1)
 
@@ -248,32 +251,42 @@ class RCF(SequentialModel):
         """
         Relational Dynamic History Aggregation
         """
+        import pdb; pdb.set_trace()
         valid_mask = (history > 0).view(batch_size, 1, seq_len, 1)
+        query_vectors = his_vectors * i_vectors[:, None, :]  # B * H * V
+        attn_hidden = self.A2(query_vectors).view(batch_size, seq_len, self.relation_num + 1, -1)
+        attn_hidden = torch.cat([attn_hidden, self.A2_val(v_vectors).unsqueeze(1).repeat((1, seq_len, 1, 1))], dim=-1)
+        target_attention = self.A2_out(attn_hidden).relu()  # B * H * R+1 * R+1
+        target_attention = torch.diagonal(target_attention, dim1=2, dim2=3)  # B * H * R+1
+        # TODO mask attention
+        context = (target_attention[:, :, :, None] * his_vectors[:, :, None, :]).sum(1)  # B * R+1 * V
         # context = self.relational_dynamic_aggregation(
         #     his_vectors, delta_t_n, i_vectors, v_vectors, valid_mask)  # B * -1 * R * V
-        context, target_attention = self.relational_dynamic_aggregation(
-            his_vectors, i_vectors, v_vectors, valid_mask)  # B * -1 * R * V
+        # context, target_attention = self.relational_dynamic_aggregation(
+        #     his_vectors, i_vectors, v_vectors, valid_mask)  # B * -1 * R * V
         if self.only_predict:
             print(target_attention[0,0])
         """
         Multi-layer Self-attention
         """
-        for i in range(self.layer_num):
-            residual = context
-            # self-attention
-            context = self.attn_head(context, context, context)
-            # feed forward
-            context = self.W1(context)
-            context = self.W2(context.relu())
-            # dropout, residual and layer_norm
-            context = self.dropout_layer(context)
-            context = self.layer_norm(residual + context)
+        # for i in range(self.layer_num):
+        #     residual = context
+        #     # self-attention
+        #     context = self.attn_head(context, context, context)
+        #     # feed forward
+        #     context = self.W1(context)
+        #     context = self.W2(context.relu())
+        #     # dropout, residual and layer_norm
+        #     context = self.dropout_layer(context)
+        #     context = self.layer_norm(residual + context)
 
         """
         Pooling Layer
         """
         if self.pooling == 'attention':
-            query_vectors = context * u_vectors[:, None, None, :]  # B * -1 * R * V
+            relation_range = torch.from_numpy(np.arange(self.relation_num)).to(self.device)
+            r_vectors = self.relation_embeddings(relation_range) # R * V
+            query_vectors = r_vectors[None, :, :] * u_vectors[:, None, :]  # B * R * V
             user_attention = self.A_out(self.A(query_vectors).tanh()).squeeze(-1)  # B * -1 * R
             user_attention = (user_attention - user_attention.max()).softmax(dim=-1)
             his_vector = (context * user_attention[:, :, :, None]).sum(dim=-2)  # B * -1 * V
