@@ -12,7 +12,7 @@ This is the official implementation for *Sequential Recommendation with Latent R
 2. Clone the repository and install requirements
 
 ```bash
-git clone https://anonymous.4open.science/r/LRD-77C6
+git clone https://github.com/ysh-1998/LRD.git
 ```
 
 3. Install requirements and step into the `src` folder
