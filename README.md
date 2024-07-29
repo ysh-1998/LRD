@@ -8,7 +8,7 @@ This is the official implementation for *Sequential Recommendation with Latent R
 
 ## Getting Started
 
-1. Install [Anaconda](https://docs.conda.io/en/latest/miniconda.html) with Python >= 3.5
+1. Install [Anaconda](https://docs.conda.io/en/latest/miniconda.html) with Python == 3.7
 2. Clone the repository and install requirements
 
 ```bash
